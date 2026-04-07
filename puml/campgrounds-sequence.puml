@@ -1,0 +1,131 @@
+@startuml Get All Campgrounds (GET)
+header Campground Sequence Diagram
+title "Get All Campgrounds (GET)"
+
+participant "Client" as client
+participant "<<javaScript>>\n:server" as server
+participant "<<router>>\n:campgrounds" as routerCampgrounds
+participant "<<controllers>>\n:campgrounds" as controllersCampgrounds
+participant "<<model>>\n:Campground" as modelCampground
+database "<<MongoDB>>\n:campgrounds" as CampgroundsDatabase
+
+client->server ++:req.get('/api/v1/campgrounds')
+server->routerCampgrounds ++:app.use('/api/v1/campgrounds', campgrounds)
+routerCampgrounds -> controllersCampgrounds ++:getCampgrounds()
+
+controllersCampgrounds->modelCampground ++:countDocuments()
+modelCampground ->CampgroundsDatabase ++: CampgroundSchema
+CampgroundsDatabase --> modelCampground --: count
+controllersCampgrounds <-- modelCampground --:total
+
+controllersCampgrounds->modelCampground ++:find().populate('bookings')
+modelCampground ->CampgroundsDatabase ++: CampgroundSchema
+CampgroundsDatabase --> modelCampground --: campgrounds
+controllersCampgrounds <-- modelCampground --:campgrounds
+
+controllersCampgrounds->client --:response
+@enduml
+
+@startuml Get Single Campground (GET)
+header Campground Sequence Diagram
+title "Get Single Campground (GET)"
+
+participant "Client" as client
+participant "<<javaScript>>\n:server" as server
+participant "<<router>>\n:campgrounds" as routerCampgrounds
+participant "<<controllers>>\n:campgrounds" as controllersCampgrounds
+participant "<<model>>\n:Campground" as modelCampground
+database "<<MongoDB>>\n:campgrounds" as CampgroundsDatabase
+
+client->server ++:req.get('/api/v1/campgrounds/:id')
+server->routerCampgrounds ++:app.use('/api/v1/campgrounds', campgrounds)
+routerCampgrounds -> controllersCampgrounds ++:getCampground()
+controllersCampgrounds->modelCampground ++:findById(req.params.id)
+modelCampground ->CampgroundsDatabase ++: CampgroundSchema
+CampgroundsDatabase --> modelCampground --: campground
+controllersCampgrounds <-- modelCampground --:campground
+controllersCampgrounds->client --:response
+@enduml
+
+@startuml Create Campground (POST)
+header Campground Sequence Diagram
+title "Create Campground (POST)"
+
+participant "Client" as client
+participant "<<javaScript>>\n:server" as server
+participant "<<router>>\n:campgrounds" as routerCampgrounds
+participant "<<middleware>>\n:auth" as middlewareAuth
+participant "<<controllers>>\n:campgrounds" as controllersCampgrounds
+participant "<<model>>\n:Campground" as modelCampground
+database "<<MongoDB>>\n:campgrounds" as CampgroundsDatabase
+
+client->server ++:req.post('/api/v1/campgrounds')
+server->routerCampgrounds ++:app.use('/api/v1/campgrounds', campgrounds)
+routerCampgrounds -> middlewareAuth ++:protect(), authorize('admin')
+middlewareAuth -> controllersCampgrounds ++:createCampground()
+controllersCampgrounds->modelCampground ++:create(req.body)
+modelCampground ->CampgroundsDatabase ++: CampgroundSchema
+CampgroundsDatabase --> modelCampground --: campground
+controllersCampgrounds <-- modelCampground --:campground
+controllersCampgrounds->client --:response
+@enduml
+
+@startuml Update Campground (PUT)
+header Campground Sequence Diagram
+title "Update Campground (PUT)"
+
+participant "Client" as client
+participant "<<javaScript>>\n:server" as server
+participant "<<router>>\n:campgrounds" as routerCampgrounds
+participant "<<middleware>>\n:auth" as middlewareAuth
+participant "<<controllers>>\n:campgrounds" as controllersCampgrounds
+participant "<<model>>\n:Campground" as modelCampground
+database "<<MongoDB>>\n:campgrounds" as CampgroundsDatabase
+
+client->server ++:req.put('/api/v1/campgrounds/:id')
+server->routerCampgrounds ++:app.use('/api/v1/campgrounds', campgrounds)
+routerCampgrounds -> middlewareAuth ++:protect(), authorize('admin')
+middlewareAuth -> controllersCampgrounds ++:updateCampground()
+controllersCampgrounds->modelCampground ++:findByIdAndUpdate(req.params.id, req.body)
+modelCampground ->CampgroundsDatabase ++: CampgroundSchema
+CampgroundsDatabase --> modelCampground --: campground
+controllersCampgrounds <-- modelCampground --:campground
+controllersCampgrounds->client --:response
+@enduml
+
+@startuml Delete Campground (DELETE)
+header Campground Sequence Diagram
+title "Delete Campground (DELETE)"
+
+participant "Client" as client
+participant "<<javaScript>>\n:server" as server
+participant "<<router>>\n:campgrounds" as routerCampgrounds
+participant "<<middleware>>\n:auth" as middlewareAuth
+participant "<<controllers>>\n:campgrounds" as controllersCampgrounds
+participant "<<model>>\n:Campground" as modelCampground
+participant "<<model>>\n:Booking" as modelBooking
+database "<<MongoDB>>\n:campgrounds" as CampgroundsDatabase
+database "<<MongoDB>>\n:bookings" as BookingsDatabase
+
+client->server ++:req.delete('/api/v1/campgrounds/:id')
+server->routerCampgrounds ++:app.use('/api/v1/campgrounds', campgrounds)
+routerCampgrounds -> middlewareAuth ++:protect(), authorize('admin')
+middlewareAuth -> controllersCampgrounds ++:deleteCampground()
+
+controllersCampgrounds->modelCampground ++:findById(req.params.id)
+modelCampground ->CampgroundsDatabase ++: CampgroundSchema
+CampgroundsDatabase --> modelCampground --: campground
+controllersCampgrounds <-- modelCampground --:campground
+
+controllersCampgrounds->modelBooking ++:deleteMany({campground: req.params.id})
+modelBooking ->BookingsDatabase ++: BookingSchema
+BookingsDatabase --> modelBooking --: result
+controllersCampgrounds <-- modelBooking --:result
+
+controllersCampgrounds->modelCampground ++:deleteOne({_id: req.params.id})
+modelCampground ->CampgroundsDatabase ++: CampgroundSchema
+CampgroundsDatabase --> modelCampground --: result
+controllersCampgrounds <-- modelCampground --:result
+
+controllersCampgrounds->client --:response
+@enduml

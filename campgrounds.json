@@ -1,0 +1,62 @@
+[
+  {
+    "name": "Khao Yai Lam Takong Camp",
+    "description": "A spacious and popular camping site located beside a scenic reservoir inside Thailand's first national park. Perfect for wildlife watching and relaxing under the stars.",
+    "address": "PO Box 9, Mu Si",
+    "district": "Pak Chong",
+    "province": "Nakhon Ratchasima",
+    "postalcode": "30130",
+    "tel": "0860926529",
+    "region": "Northeastern",
+    "pricePerNight": 500,
+    "picture": "https://thumbs.dreamstime.com/b/khao-yai-national-park-office-lam-takong-tent-camping-area-world-heritage-forest-thailand-khao-yai-national-park-office-323743858.jpg"
+  },
+  {
+    "name": "Doi Inthanon Dong Son Camp",
+    "description": "Experience chilly nights nestled among pine trees near the highest peak in Thailand. Offers easy access to stunning waterfalls, royal pagodas, and nature trails.",
+    "address": "119 Ban Luang",
+    "district": "Chom Thong",
+    "province": "Chiang Mai",
+    "postalcode": "50160",
+    "tel": "053286729",
+    "region": "Northern",
+    "pricePerNight": 600,
+    "picture": "https://doi-inthanon.com/wp-content/uploads/2023/04/camping-Doi-Inthanon-thailand-2.jpg"
+  },
+  {
+    "name": "Ban Krang Camp Kaeng Krachan",
+    "description": "Deep inside Thailand's largest national park, this campground is world-renowned for bird and butterfly watching right from your tent.",
+    "address": "Kaeng Krachan National Park",
+    "district": "Kaeng Krachan",
+    "province": "Phetchaburi",
+    "postalcode": "76170",
+    "tel": "032772311",
+    "region": "Western",
+    "pricePerNight": 400,
+    "picture": "https://huahintoday.com/wp-content/uploads/2023/03/IMG_0626.jpg"
+  },
+  {
+    "name": "Phu Kradueng Wang Kwang Camp",
+    "description": "Located on top of a bell-shaped mountain plateau. Accessible only by a strenuous hike, but rewards campers with sprawling pine forests, red maple leaves, and breathtaking sunrises.",
+    "address": "Moo 1, Baan Si Than",
+    "district": "Phu Kradueng",
+    "province": "Loei",
+    "postalcode": "42180",
+    "tel": "042810833",
+    "region": "Northeastern",
+    "pricePerNight": 450,
+    "picture": "https://www.thainationalparks.com/img/poi/snippets/phu-kradueng-national-park.jpg"
+  },
+  {
+    "name": "Erawan Riverside Campground",
+    "description": "Sleep to the sound of flowing water at this lush campground, located just a short walk from the iconic, seven-tiered emerald-green Erawan waterfalls.",
+    "address": "Moo 4, Tha Kradan",
+    "district": "Si Sawat",
+    "province": "Kanchanaburi",
+    "postalcode": "71250",
+    "tel": "034574222",
+    "region": "Western",
+    "pricePerNight": 550,
+    "picture": "https://backpacking-tours.imgix.net/storage/uploads/backpacking-thailand/day6/day6camping_xwhgd.jpg?w=1920&crop=faces&q=75&auto=format&fm=png"
+  }
+]

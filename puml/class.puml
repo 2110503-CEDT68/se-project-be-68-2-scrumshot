@@ -1,0 +1,87 @@
+@startuml
+left to right direction
+package "CampgroundBooking"{
+    class "<<Application>>\nCampgroundBookingService" as CampgroundBookingService{}
+
+    package "Resources" {
+        class "<<Resource>>\nAuth" as ResourceAuth{
+            <<POST>> +register():User
+            <<POST>> +login():User
+            <<GET>> +getMe():User
+            <<GET>> +logout():void
+        }
+
+        class "<<Resource>>\nCampgrounds" as ResourceCampgrounds{
+            <<GET>> +getCampgrounds():Campground
+            <<POST>> +createCampground():Campground
+        }
+
+        class "<<Resource>>\nCampground" as ResourceCampground {
+            <<GET>> +getCampground(): Campground
+            <<PUT>> +updateCampground(): Campground
+            <<DELETE>> +deleteCampground(): void
+        }
+
+        class "<<Resource>>\nBookings" as ResourceBookings{
+            <<GET>> +getBookings():Booking
+            <<POST>> +addBooking():Booking
+        }
+
+        class "<<Resource>>\nBooking" as ResourceBooking {
+            <<GET>> +getBooking(): Booking
+            <<PUT>> +updateBooking(): Booking
+            <<DELETE>> +deleteBooking(): void
+        }
+    }
+
+    package "Representations" {
+        class "<<Representation>>\nUser" as RepresentationUser {
+            -name
+            -email
+            -tel
+            -role
+            -password
+            -resetPasswordToken
+            -resetPasswordExpire
+            -createdAt
+        }
+
+        class "<<Representation>>\nCampground" as RepresentationCampground {
+            -name
+            -description
+            -address
+            -district
+            -province
+            -postalcode
+            -tel
+            -region
+            -pricePerNight
+            -createdAt
+        }
+
+        class "<<Representation>>\nBooking" as RepresentationBooking {
+            -bookDate
+            -bookEndDate
+            -user
+            -campground
+            -totalPrice
+            -createdAt
+        }
+    }
+}
+
+CampgroundBookingService ..> ResourceAuth:"/auth\n<<Path>>"
+ResourceAuth ..> RepresentationUser: "<<use>>"
+
+CampgroundBookingService ..> ResourceCampgrounds:"/campgrounds\n<<Path>>"
+ResourceCampgrounds ..> ResourceCampground: "/{id}\n<<Path>>"
+ResourceCampground ..> RepresentationCampground: "<<use>>"
+
+CampgroundBookingService ..> ResourceBookings:"/bookings\n<<Path>>"
+ResourceBookings ..> ResourceBooking: "/{id}\n<<Path>>"
+ResourceBooking ..> RepresentationBooking: "<<use>>"
+
+RepresentationUser "1" --> "*" RepresentationBooking: "has\n<<Reference>>"
+RepresentationCampground "1" --> "*" RepresentationBooking: "has\n<<Reference>>"
+
+@enduml

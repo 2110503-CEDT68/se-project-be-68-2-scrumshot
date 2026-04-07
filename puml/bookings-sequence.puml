@@ -1,0 +1,148 @@
+@startuml Get All Bookings (GET)
+header Booking Sequence Diagram
+title "Get All Bookings (GET)"
+
+participant "Client" as client
+participant "<<javaScript>>\n:server" as server
+participant "<<router>>\n:bookings" as routerBookings
+participant "<<middleware>>\n:auth" as middlewareAuth
+participant "<<controllers>>\n:bookings" as controllersBookings
+participant "<<model>>\n:Booking" as modelBooking
+database "<<MongoDB>>\n:bookings" as BookingsDatabase
+
+client->server ++:req.get('/api/v1/bookings')
+server->routerBookings ++:app.use('/api/v1/bookings', bookings)
+routerBookings -> middlewareAuth ++:protect()
+middlewareAuth -> controllersBookings ++:getBookings()
+controllersBookings->modelBooking ++:find().populate('campground')
+modelBooking ->BookingsDatabase ++: BookingSchema
+BookingsDatabase --> modelBooking --: bookings
+controllersBookings <-- modelBooking --:bookings
+controllersBookings->client --:response
+@enduml
+
+@startuml Get Single Booking (GET)
+header Booking Sequence Diagram
+title "Get Single Booking (GET)"
+
+participant "Client" as client
+participant "<<javaScript>>\n:server" as server
+participant "<<router>>\n:bookings" as routerBookings
+participant "<<middleware>>\n:auth" as middlewareAuth
+participant "<<controllers>>\n:bookings" as controllersBookings
+participant "<<model>>\n:Booking" as modelBooking
+database "<<MongoDB>>\n:bookings" as BookingsDatabase
+
+client->server ++:req.get('/api/v1/bookings/:id')
+server->routerBookings ++:app.use('/api/v1/bookings', bookings)
+routerBookings -> middlewareAuth ++:protect()
+middlewareAuth -> controllersBookings ++:getBooking()
+controllersBookings->modelBooking ++:findById(req.params.id).populate('campground')
+modelBooking ->BookingsDatabase ++: BookingSchema
+BookingsDatabase --> modelBooking --: booking
+controllersBookings <-- modelBooking --:booking
+controllersBookings->client --:response
+@enduml
+
+@startuml Create New Booking (POST)
+header Booking Sequence Diagram
+title "Create New Booking (POST)"
+
+participant "Client" as client
+participant "<<javaScript>>\n:server" as server
+participant "<<router>>\n:campgrounds" as routerCampgrounds
+participant "<<router>>\n:bookings" as routerBookings
+participant "<<middleware>>\n:auth" as middlewareAuth
+participant "<<controllers>>\n:bookings" as controllersBookings
+participant "<<model>>\n:Campground" as modelCampground
+participant "<<model>>\n:Booking" as modelBooking
+database "<<MongoDB>>\n:campgrounds" as CampgroundsDatabase
+database "<<MongoDB>>\n:bookings" as BookingsDatabase
+
+client->server ++:req.post('/api/v1/campgrounds/:campgroundId/bookings')
+server->routerCampgrounds ++:app.use('/api/v1/campgrounds', campgrounds)
+routerCampgrounds->routerBookings ++:router.use('/:campgroundId/bookings', bookingRouter)
+routerBookings -> middlewareAuth ++:protect(), authorize('admin', 'user')
+middlewareAuth -> controllersBookings ++:addBooking()
+
+controllersBookings->modelCampground ++:findById(req.params.campgroundId)
+modelCampground ->CampgroundsDatabase ++: CampgroundSchema
+CampgroundsDatabase --> modelCampground --: campground
+controllersBookings <-- modelCampground --:campground
+
+controllersBookings->modelBooking ++:create(req.body)
+modelBooking ->BookingsDatabase ++: BookingSchema
+BookingsDatabase --> modelBooking --: booking
+controllersBookings <-- modelBooking --:booking
+
+controllersBookings->client --:response
+@enduml
+
+@startuml Update Booking (PUT)
+header Booking Sequence Diagram
+title "Update Booking (PUT)"
+
+participant "Client" as client
+participant "<<javaScript>>\n:server" as server
+participant "<<router>>\n:bookings" as routerBookings
+participant "<<middleware>>\n:auth" as middlewareAuth
+participant "<<controllers>>\n:bookings" as controllersBookings
+participant "<<model>>\n:Campground" as modelCampground
+participant "<<model>>\n:Booking" as modelBooking
+database "<<MongoDB>>\n:campgrounds" as CampgroundsDatabase
+database "<<MongoDB>>\n:bookings" as BookingsDatabase
+
+client->server ++:req.put('/api/v1/bookings/:id')
+server->routerBookings ++:app.use('/api/v1/bookings', bookings)
+routerBookings -> middlewareAuth ++:protect(), authorize('admin', 'user')
+middlewareAuth -> controllersBookings ++:updateBooking()
+
+controllersBookings->modelBooking ++:findById(req.params.id)
+modelBooking ->BookingsDatabase ++: BookingSchema
+BookingsDatabase --> modelBooking --: booking
+controllersBookings <-- modelBooking --:booking
+
+opt req.body has bookDate, bookEndDate, or campground
+    controllersBookings->modelCampground ++:findById(targetCampgroundId)
+    modelCampground ->CampgroundsDatabase ++: CampgroundSchema
+    CampgroundsDatabase --> modelCampground --: campgroundInfo
+    controllersBookings <-- modelCampground --:campgroundInfo
+end
+
+controllersBookings->modelBooking ++:findByIdAndUpdate(req.params.id, req.body)
+modelBooking ->BookingsDatabase ++: BookingSchema
+BookingsDatabase --> modelBooking --: updatedBooking
+controllersBookings <-- modelBooking --:updatedBooking
+
+controllersBookings->client --:response
+@enduml
+
+@startuml Delete Booking (DELETE)
+header Booking Sequence Diagram
+title "Delete Booking (DELETE)"
+
+participant "Client" as client
+participant "<<javaScript>>\n:server" as server
+participant "<<router>>\n:bookings" as routerBookings
+participant "<<middleware>>\n:auth" as middlewareAuth
+participant "<<controllers>>\n:bookings" as controllersBookings
+participant "<<model>>\n:Booking" as modelBooking
+database "<<MongoDB>>\n:bookings" as BookingsDatabase
+
+client->server ++:req.delete('/api/v1/bookings/:id')
+server->routerBookings ++:app.use('/api/v1/bookings', bookings)
+routerBookings -> middlewareAuth ++:protect(), authorize('admin', 'user')
+middlewareAuth -> controllersBookings ++:deleteBooking()
+
+controllersBookings->modelBooking ++:findById(req.params.id)
+modelBooking ->BookingsDatabase ++: BookingSchema
+BookingsDatabase --> modelBooking --: booking
+controllersBookings <-- modelBooking --:booking
+
+controllersBookings->modelBooking ++:deleteOne()
+modelBooking ->BookingsDatabase ++: BookingSchema
+BookingsDatabase --> modelBooking --: result
+controllersBookings <-- modelBooking --:result
+
+controllersBookings->client --:response
+@enduml
