@@ -110,6 +110,31 @@ exports.getCampground = async (req, res, next) => {
     const campground = await Campground.findById(req.params.id);
     if (!campground) return res.status(400).json({ success: false, message: "Campground not found" });
     
+    const ratingData = await Booking.aggregate([
+      {
+        $match: {
+          campground: campground._id,
+          "review.rating": { $exists: true, $ne: null },
+          "review.isHidden": { $ne: true }
+        }
+      },
+      {
+        $group: {
+          _id: "$campground",
+          avgRating: { $avg: "$review.rating" },
+          totalReviews: { $sum: 1 }
+        }
+      }
+    ]);
+
+    const avgRating = ratingData.length > 0 ? Math.round(ratingData[0].avgRating * 10) / 10 : 0;
+    const totalReviews = ratingData.length > 0 ? ratingData[0].totalReviews : 0;  
+
+    res.status(200).json({ success: true, data: {
+        ...campground._doc,
+        avgRating,
+        totalReviews
+      } });
   } catch (err) {
     res.status(400).json({ success: false, message: err.message });
   }
