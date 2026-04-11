@@ -255,7 +255,7 @@ exports.deleteReview = async (req, res, next) => {
     if (!booking || !booking.review) {
       return res.status(404).json({
         success: false,
-        message: `No Review with the id of ${req.params.id}`,
+        message: `No Review with the BookingId of ${req.params.id}`,
       });
     }
 
