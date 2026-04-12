@@ -32,7 +32,7 @@ const BookingSchema = new mongoose.Schema({
     comment: {
       type: String,
     },
-    isLocked: {
+    adminModified: {
       type: Boolean,
       default: false,
     },

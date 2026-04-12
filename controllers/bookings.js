@@ -266,6 +266,10 @@ exports.deleteReview = async (req, res, next) => {
       });
     }
 
+    if (req.user.role == "admin") {
+      booking.review.adminModified = true;
+    }
+
     booking.review.isHidden = true;
     await booking.save();
 
