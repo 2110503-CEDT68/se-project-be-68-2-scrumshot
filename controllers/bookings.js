@@ -171,6 +171,8 @@ exports.updateBooking = async (req, res, next) => {
       });
     }
 
+    delete req.body.review;
+
     if (req.user.role !== "admin") {
       delete req.body.user; 
       delete req.body.totalPrice;
