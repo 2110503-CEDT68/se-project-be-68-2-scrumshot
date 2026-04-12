@@ -21,10 +21,21 @@ exports.getBookings = async (req, res, next) => {
   try {
     const bookings = await query;
 
+    const cleanBookings = bookings.map(booking => {
+      const b = booking.toJSON();
+      if (b.review && !b.review.rating) {
+        delete b.review;
+      } 
+      else if (b.review && b.review.isHidden && req.user.role !== "admin") {
+        b.review = { isHidden: true, adminModified: b.review.adminModified };
+      }
+      return b;
+    });
+
     res.status(200).json({
       success: true,
       count: bookings.length,
-      data: bookings,
+      data: cleanBookings,
     });
   } catch (error) {
     console.log(error);
@@ -58,9 +69,17 @@ exports.getBooking = async (req, res, next) => {
       });
     }
 
+    let cleanBooking = booking.toJSON();
+
+    if (cleanBooking.review && !cleanBooking.review.rating) {
+      delete cleanBooking.review;
+    } else if (cleanBooking.review && cleanBooking.review.isHidden && req.user.role !== "admin") {
+      cleanBooking.review = { isHidden: true, adminModified: cleanBooking.review.adminModified };
+    }
+
     res.status(200).json({
       success: true,
-      data: booking,
+      data: cleanBooking,
     });
   } catch (error) {
     console.log(error);
