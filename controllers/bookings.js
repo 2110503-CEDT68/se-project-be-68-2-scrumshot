@@ -302,8 +302,8 @@ exports.getReview = async (req, res, next) => {
         select: "name"
       });
 
-    if (!booking || !booking.review || !booking.review.rating) {
-      return res.status(404).json({ success: false, message: "Review not found" });
+    if (!booking || !booking.review || !booking.review.rating || booking.review.isHidden) {
+      return res.status(404).json({ success: false, message: "Review not found or has been deleted" });
     }
 
     const reviewData = {
