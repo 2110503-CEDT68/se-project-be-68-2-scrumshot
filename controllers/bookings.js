@@ -244,6 +244,85 @@ exports.deleteBooking = async (req, res, next) => {
   }
 };
 
+// @desc    Get all reviews for a campground
+// @route   GET /api/v1/campgrounds/:campgroundId/reviews
+// @access  Public
+exports.getCampgroundReviews = async (req, res, next) => {
+  try {
+    const campground = await Campground.findById(req.params.campgroundId);
+    if (!campground) {
+      return res.status(404).json({
+        success: false,
+        message: `No campground with the id of ${req.params.campgroundId}`,
+      });
+    }
+
+    const bookingsWithReviews = await Booking.find({
+      campground: req.params.campgroundId,
+      "review.rating": { $exists: true, $ne: null },
+      "review.isHidden": { $ne: true },
+    })
+      .populate({
+        path: "user",
+        select: "name",
+      })
+      .sort("-createdAt");
+
+    const reviews = bookingsWithReviews.map((booking) => ({
+      _id: booking._id,
+      rating: booking.review.rating,
+      comment: booking.review.comment,
+      isLocked: booking.review.isLocked,
+      user: booking.user,
+      createdAt: booking.createdAt,
+    }));
+
+    res.status(200).json({
+      success: true,
+      count: reviews.length,
+      data: reviews,
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+// @desc    Get single review (from a booking)
+// @route   GET /api/v1/bookings/:id/review
+// @access  Public
+exports.getReview = async (req, res, next) => {
+  try {
+    const booking = await Booking.findById(req.params.id)
+      .populate({
+        path: "campground",
+        select: "name province"
+      })
+      .populate({
+        path: "user",
+        select: "name"
+      });
+
+    if (!booking || !booking.review || !booking.review.rating) {
+      return res.status(404).json({ success: false, message: "Review not found" });
+    }
+
+    const reviewData = {
+      _id: booking._id,
+      rating: booking.review.rating,
+      comment: booking.review.comment,
+      isLocked: booking.review.isLocked,
+      isHidden: booking.review.isHidden,
+      campground: booking.campground,
+      user: booking.user
+    };
+
+    res.status(200).json({ success: true, data: reviewData });
+  } catch (err) {
+    res.status(400).json({ success: false, message: err.message });
+  }
+};
+
+
 
 // @desc    Delete Review
 // @route   DELETE /api/v1/bookings/:id/review
