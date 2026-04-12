@@ -5,6 +5,10 @@ const {
   addBooking,
   updateBooking,
   deleteBooking,
+  getCampgroundReviews,
+  getReview,
+  deleteReview,
+  
 } = require("../controllers/bookings");
 
 /**
@@ -190,4 +194,8 @@ router
   .put(protect, authorize("admin", "user"), updateBooking)
   .delete(protect, authorize("admin", "user"), deleteBooking);
 
+router
+  .route("/:id/review")
+  .get(getReview)
+  .delete(protect, authorize("admin", "user"), deleteReview);
 module.exports = router;

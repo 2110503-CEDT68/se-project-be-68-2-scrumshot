@@ -1,5 +1,6 @@
 const Campground = require("../models/Campground");
 const Booking = require("../models/Booking");
+const mongoose = require("mongoose")
 
 // @desc     Get all campgrounds
 // @route    GET /api/v1/campgrounds
@@ -64,9 +65,38 @@ exports.getCampgrounds = async (req, res, next) => {
         limit,
       };
     }
+
+    const campgroundIds = campgrounds.map(camp => camp._id);
+
+    const rating = await Booking.aggregate([
+      {
+        $match: {
+          campground: { $in: campgroundIds },
+          "review.rating": { $exists: true, $ne: null },
+          "review.isHidden": { $ne: true }
+        }
+      },
+      {
+        $group: {
+          _id: "$campground",
+          avgRating: { $avg: "$review.rating" },
+          totalReviews: { $sum: 1 }
+        }
+      }
+    ])
+
+    const formattedCampgrounds = campgrounds.map(camp => {
+      const ratingData = rating.find(r => r._id.toString() === camp._id.toString());
+      return {
+        ...camp._doc,
+        avgRating: ratingData ? Math.round(ratingData.avgRating * 10) / 10 : 0,
+        totalReviews: ratingData ? ratingData.totalReviews : 0
+      };
+    });
+
     res
       .status(200)
-      .json({ success: true, count: campgrounds.length, data: campgrounds });
+      .json({ success: true, count: formattedCampgrounds.length, pagination, data: formattedCampgrounds });
   } catch (err) {
     res.status(400).json({ success: false, message: err.message });
   }
@@ -79,7 +109,32 @@ exports.getCampground = async (req, res, next) => {
   try {
     const campground = await Campground.findById(req.params.id);
     if (!campground) return res.status(400).json({ success: false, message: "Campground not found" });
-    res.status(200).json({ success: true, data: campground });
+    
+    const ratingData = await Booking.aggregate([
+      {
+        $match: {
+          campground: campground._id,
+          "review.rating": { $exists: true, $ne: null },
+          "review.isHidden": { $ne: true }
+        }
+      },
+      {
+        $group: {
+          _id: "$campground",
+          avgRating: { $avg: "$review.rating" },
+          totalReviews: { $sum: 1 }
+        }
+      }
+    ]);
+
+    const avgRating = ratingData.length > 0 ? Math.round(ratingData[0].avgRating * 10) / 10 : 0;
+    const totalReviews = ratingData.length > 0 ? ratingData[0].totalReviews : 0;  
+
+    res.status(200).json({ success: true, data: {
+        ...campground._doc,
+        avgRating,
+        totalReviews
+      } });
   } catch (err) {
     res.status(400).json({ success: false, message: err.message });
   }

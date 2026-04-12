@@ -21,10 +21,21 @@ exports.getBookings = async (req, res, next) => {
   try {
     const bookings = await query;
 
+    const cleanBookings = bookings.map(booking => {
+      const b = booking.toJSON();
+      if (b.review && !b.review.rating) {
+        delete b.review;
+      } 
+      else if (b.review && b.review.isHidden && req.user.role !== "admin") {
+        b.review = { isHidden: true, adminModified: b.review.adminModified };
+      }
+      return b;
+    });
+
     res.status(200).json({
       success: true,
       count: bookings.length,
-      data: bookings,
+      data: cleanBookings,
     });
   } catch (error) {
     console.log(error);
@@ -58,9 +69,17 @@ exports.getBooking = async (req, res, next) => {
       });
     }
 
+    let cleanBooking = booking.toJSON();
+
+    if (cleanBooking.review && !cleanBooking.review.rating) {
+      delete cleanBooking.review;
+    } else if (cleanBooking.review && cleanBooking.review.isHidden && req.user.role !== "admin") {
+      cleanBooking.review = { isHidden: true, adminModified: cleanBooking.review.adminModified };
+    }
+
     res.status(200).json({
       success: true,
-      data: booking,
+      data: cleanBooking,
     });
   } catch (error) {
     console.log(error);
@@ -152,6 +171,8 @@ exports.updateBooking = async (req, res, next) => {
       });
     }
 
+    delete req.body.review;
+
     if (req.user.role !== "admin") {
       delete req.body.user; 
       delete req.body.totalPrice;
@@ -240,6 +261,127 @@ exports.deleteBooking = async (req, res, next) => {
     return res.status(500).json({
       success: false,
       message: "Cannot delete Booking",
+    });
+  }
+};
+
+// @desc    Get all reviews for a campground
+// @route   GET /api/v1/campgrounds/:campgroundId/reviews
+// @access  Public
+exports.getCampgroundReviews = async (req, res, next) => {
+  try {
+    const campground = await Campground.findById(req.params.campgroundId);
+    if (!campground) {
+      return res.status(404).json({
+        success: false,
+        message: `No campground with the id of ${req.params.campgroundId}`,
+      });
+    }
+
+    const bookingsWithReviews = await Booking.find({
+      campground: req.params.campgroundId,
+      "review.rating": { $exists: true, $ne: null },
+      "review.isHidden": { $ne: true },
+    })
+      .populate({
+        path: "user",
+        select: "name",
+      })
+      .sort("-createdAt");
+
+    const reviews = bookingsWithReviews.map((booking) => ({
+      _id: booking._id,
+      rating: booking.review.rating,
+      comment: booking.review.comment,
+      isLocked: booking.review.isLocked,
+      user: booking.user,
+      createdAt: booking.createdAt,
+    }));
+
+    res.status(200).json({
+      success: true,
+      count: reviews.length,
+      data: reviews,
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+// @desc    Get single review (from a booking)
+// @route   GET /api/v1/bookings/:id/review
+// @access  Public
+exports.getReview = async (req, res, next) => {
+  try {
+    const booking = await Booking.findById(req.params.id)
+      .populate({
+        path: "campground",
+        select: "name province"
+      })
+      .populate({
+        path: "user",
+        select: "name"
+      });
+
+    if (!booking || !booking.review || !booking.review.rating || booking.review.isHidden) {
+      return res.status(404).json({ success: false, message: "Review not found or has been deleted" });
+    }
+
+    const reviewData = {
+      _id: booking._id,
+      rating: booking.review.rating,
+      comment: booking.review.comment,
+      isLocked: booking.review.isLocked,
+      isHidden: booking.review.isHidden,
+      campground: booking.campground,
+      user: booking.user
+    };
+
+    res.status(200).json({ success: true, data: reviewData });
+  } catch (err) {
+    res.status(400).json({ success: false, message: err.message });
+  }
+};
+
+
+
+// @desc    Delete Review
+// @route   DELETE /api/v1/bookings/:id/review
+// @access  Private
+exports.deleteReview = async (req, res, next) => {
+  try {
+    const booking = await Booking.findById(req.params.id);
+
+    if (!booking || !booking.review) {
+      return res.status(404).json({
+        success: false,
+        message: `No Review with the BookingId of ${req.params.id}`,
+      });
+    }
+
+    if (booking.user.toString() !== req.user.id && req.user.role !== "admin") {
+      return res.status(401).json({
+        success: false,
+        message: `User ${req.user.id} is not authorized to delete this Review`,
+      });
+    }
+
+    if (req.user.role == "admin") {
+      booking.review.adminModified = true;
+    }
+
+    booking.review.isHidden = true;
+    await booking.save();
+
+    res.status(200).json({
+      success: true,
+      data: {},
+    });
+  } catch (error) {
+    console.log(error);
+    return res.status(500).json({
+      success: false,
+      message: "Cannot delete Review",
     });
   }
 };

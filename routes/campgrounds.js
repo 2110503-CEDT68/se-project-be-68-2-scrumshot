@@ -172,11 +172,15 @@ const {
 
 const bookingRouter = require("./bookings");
 
+const { getCampgroundReviews } = require("../controllers/bookings");
+
 const router = express.Router();
 
 const { protect, authorize } = require("../middleware/auth");
 
 router.use("/:campgroundId/bookings", bookingRouter);
+
+router.route("/:campgroundId/reviews").get(getCampgroundReviews);
 
 router
   .route("/")
