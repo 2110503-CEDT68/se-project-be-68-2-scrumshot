@@ -293,7 +293,7 @@ exports.getCampgroundReviews = async (req, res, next) => {
       _id: booking._id,
       rating: booking.review.rating,
       comment: booking.review.comment,
-      isLocked: booking.review.isLocked,
+      adminModified: booking.review.adminModified,
       user: booking.user,
       createdAt: booking.createdAt,
     }));
@@ -331,7 +331,7 @@ exports.getReview = async (req, res, next) => {
       _id: booking._id,
       rating: booking.review.rating,
       comment: booking.review.comment,
-      isLocked: booking.review.isLocked,
+      adminModified: booking.review.adminModified,
       isHidden: booking.review.isHidden,
       campground: booking.campground,
       user: booking.user
