@@ -7,8 +7,8 @@ const {
   deleteBooking,
   getCampgroundReviews,
   getReview,
+  addReview,
   deleteReview,
-  
 } = require("../controllers/bookings");
 
 /**
@@ -196,6 +196,5 @@ router
 
 router
   .route("/:id/review")
-  .get(getReview)
-  .delete(protect, authorize("admin", "user"), deleteReview);
+  .get(getReview)  .post(protect, authorize('admin', 'user'), addReview)  .delete(protect, authorize("admin", "user"), deleteReview);
 module.exports = router;
