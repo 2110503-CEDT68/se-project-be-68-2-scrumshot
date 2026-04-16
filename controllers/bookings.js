@@ -345,6 +345,60 @@ exports.getReview = async (req, res, next) => {
 
 
 
+// @desc    Create or Update Review
+// @route   PUT /api/v1/bookings/:id/review
+// @access  Private
+exports.updateReview = async (req, res, next) => {
+  try {
+    const booking = await Booking.findById(req.params.id);
+
+    if (!booking) {
+      return res.status(404).json({
+        success: false,
+        message: `No Booking with the id of ${req.params.id}`,
+      });
+    }
+
+    if (booking.user.toString() !== req.user.id && req.user.role !== "admin") {
+      return res.status(401).json({
+        success: false,
+        message: `User ${req.user.id} is not authorized to update this Review`,
+      });
+    }
+
+    const { rating, comment } = req.body;
+
+    if (!rating || rating < 1 || rating > 5) {
+      return res.status(400).json({
+        success: false,
+        message: "Rating must be between 1 and 5",
+      });
+    }
+
+    const adminModified = req.user.role === "admin" ? true : (booking.review?.adminModified || false);
+
+    booking.review = {
+      rating,
+      comment,
+      isHidden: false,
+      adminModified,
+    };
+
+    await booking.save();
+
+    res.status(200).json({
+      success: true,
+      data: booking.review,
+    });
+  } catch (error) {
+    console.log(error);
+    return res.status(500).json({
+      success: false,
+      message: "Cannot update Review",
+    });
+  }
+};
+
 // @desc    Delete Review
 // @route   DELETE /api/v1/bookings/:id/review
 // @access  Private
