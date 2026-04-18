@@ -421,6 +421,12 @@ exports.addReview = async (req, res, next) => {
           message: "This review has been deleted by an admin and cannot be recreated",
         });
     }
+    
+    if (booking.bookEndDate > new Date()) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Cannot review a booking that has not ended yet" });
+    }
 
     booking.review = {
       rating,

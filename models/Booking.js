@@ -1,5 +1,24 @@
 const mongoose = require("mongoose");
 
+const ReviewSchema = new mongoose.Schema({
+  rating: {
+    type: Number,
+    min: 1,
+    max: 5,
+  },
+  comment: {
+    type: String,
+  },
+  adminModified: {
+    type: Boolean,
+    deafult: false,
+  },
+  isHidden: {
+    type: Boolean,
+    default: false,
+  }
+});
+
 const BookingSchema = new mongoose.Schema({
   bookDate: {
     type: Date,
@@ -24,22 +43,8 @@ const BookingSchema = new mongoose.Schema({
     required: true,
   },
   review: {
-    rating: {
-      type: Number,
-      min: 1,
-      max: 5,
-    },
-    comment: {
-      type: String,
-    },
-    adminModified: {
-      type: Boolean,
-      default: false,
-    },
-    isHidden: {
-      type: Boolean,
-      default: false,   
-    }
+    type: ReviewSchema,
+    default: null,
   },
   createdAt: {
     type: Date,
