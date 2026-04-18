@@ -16,7 +16,11 @@ const ReviewSchema = new mongoose.Schema({
   isHidden: {
     type: Boolean,
     default: false,
-  }
+  },
+  createdAt: {
+    type: Date,
+    default: Date.now,
+  },
 });
 
 const BookingSchema = new mongoose.Schema({

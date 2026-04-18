@@ -297,6 +297,10 @@ exports.getCampgroundReviews = async (req, res, next) => {
         path: "user",
         select: "name",
       })
+      .populate({
+        path: "campground",
+        select: "name",
+      })
       .sort("-createdAt");
 
     const reviews = bookingsWithReviews.map((booking) => ({
@@ -304,8 +308,9 @@ exports.getCampgroundReviews = async (req, res, next) => {
       rating: booking.review.rating,
       comment: booking.review.comment,
       adminModified: booking.review.adminModified,
+      campground: booking.campground,
       user: booking.user,
-      createdAt: booking.createdAt,
+      createdAt: booking.review.createdAt,
     }));
 
     res.status(200).json({
@@ -326,7 +331,7 @@ exports.getReview = async (req, res, next) => {
     const booking = await Booking.findById(req.params.id)
       .populate({
         path: "campground",
-        select: "name province",
+        select: "name",
       })
       .populate({
         path: "user",
@@ -352,9 +357,10 @@ exports.getReview = async (req, res, next) => {
       rating: booking.review.rating,
       comment: booking.review.comment,
       adminModified: booking.review.adminModified,
-      isHidden: booking.review.isHidden,
+      // isHidden: booking.review.isHidden,
       campground: booking.campground,
       user: booking.user,
+      createdAt: booking.review.createdAt,
     };
 
     res.status(200).json({ success: true, data: reviewData });
@@ -386,7 +392,15 @@ exports.addReview = async (req, res, next) => {
         });
     }
 
-    const booking = await Booking.findById(req.params.id);
+    const booking = await Booking.findById(req.params.id)
+      .populate({
+        path: "campground",
+        select: "name",
+      })
+      .populate({
+        path: "user",
+        select: "name",
+      });
 
     if (!booking) {
       return res
@@ -397,7 +411,7 @@ exports.addReview = async (req, res, next) => {
         });
     }
 
-    if (booking.user.toString() !== req.user.id && req.user.role !== "admin") {
+    if (booking.user._id.toString() !== req.user.id && req.user.role !== "admin") {
       return res
         .status(401)
         .json({
@@ -437,7 +451,18 @@ exports.addReview = async (req, res, next) => {
 
     await booking.save();
 
-    res.status(201).json({ success: true, data: booking.review });
+    res.status(201).json({
+      success: true,
+      data: {
+        _id: booking._id,
+        rating,
+        comment,
+        adminModified: booking.review.adminModified,
+        campground: booking.campground,
+        user: booking.user,
+        createdAt: booking.review.createdAt,
+      }
+    });
   } catch (err) {
     console.log(err.stack);
     return res
@@ -451,7 +476,15 @@ exports.addReview = async (req, res, next) => {
 // @access  Private
 exports.updateReview = async (req, res, next) => {
   try {
-    const booking = await Booking.findById(req.params.id);
+    const booking = await Booking.findById(req.params.id)
+      .populate({
+        path: "campground",
+        select: "name",
+      })
+      .populate({
+        path: "user",
+        select: "name",
+      });
 
     if (!booking) {
       return res.status(404).json({
@@ -460,7 +493,7 @@ exports.updateReview = async (req, res, next) => {
       });
     }
 
-    if (booking.user.toString() !== req.user.id && req.user.role !== "admin") {
+    if (booking.user._id.toString() !== req.user.id && req.user.role !== "admin") {
       return res.status(401).json({
         success: false,
         message: `User ${req.user.id} is not authorized to update this Review`,
@@ -492,18 +525,23 @@ exports.updateReview = async (req, res, next) => {
 
     const adminModified = req.user.role === "admin" ? true : (booking.review?.adminModified || false);
 
-    booking.review = {
-      rating,
-      comment,
-      isHidden: false,
-      adminModified,
-    };
+    booking.review.rating = rating
+    booking.review.comment = comment
+    booking.review.adminModified = adminModified
 
     await booking.save();
 
     res.status(200).json({
       success: true,
-      data: booking.review,
+      data: {
+        _id: booking._id,
+        rating,
+        comment,
+        adminModified,
+        campground: booking.campground,
+        user: booking.user,
+        createdAt: booking.review.createdAt,
+      }
     });
     
   } catch (error) {
