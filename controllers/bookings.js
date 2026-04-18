@@ -288,10 +288,12 @@ exports.getCampgroundReviews = async (req, res, next) => {
       });
     }
 
+    const isAdmin = req.user && req.user.role === "admin";
+
     const bookingsWithReviews = await Booking.find({
       campground: req.params.campgroundId,
       "review.rating": { $exists: true, $ne: null },
-      "review.isHidden": { $ne: true },
+      ...(isAdmin ? {} : { "review.isHidden": { $ne: true } }),
     })
       .populate({
         path: "user",
@@ -309,6 +311,7 @@ exports.getCampgroundReviews = async (req, res, next) => {
       comment: booking.review.comment,
       adminModified: booking.review.adminModified,
       isHidden: booking.review.isHidden,
+      isLocked: booking.review.isLocked,
       campground: booking.campground,
       user: booking.user,
       createdAt: booking.review.createdAt,
@@ -436,6 +439,15 @@ exports.addReview = async (req, res, next) => {
           message: "This review has been deleted by an admin and cannot be recreated",
         });
     }
+
+    if (booking.review && booking.review.isLocked) {
+      return res
+        .status(403)
+        .json({
+          success: false,
+          message: "This review is locked and cannot be recreated",
+        });
+    }
     
     if (booking.bookEndDate > new Date()) {
       return res
@@ -506,6 +518,13 @@ exports.updateReview = async (req, res, next) => {
       return res.status(400).json({
         success: false,
         message: "This booking doesn't contain a Review",
+      });
+    }
+
+    if (booking.review.isLocked) {
+      return res.status(403).json({
+        success: false,
+        message: "This review is locked and cannot be updated",
       });
     }
 
