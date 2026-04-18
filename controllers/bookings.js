@@ -21,12 +21,11 @@ exports.getBookings = async (req, res, next) => {
   try {
     const bookings = await query;
 
-    const cleanBookings = bookings.map(booking => {
+    const cleanBookings = bookings.map((booking) => {
       const b = booking.toJSON();
       if (b.review && !b.review.rating) {
         delete b.review;
-      } 
-      else if (b.review && b.review.isHidden && req.user.role !== "admin") {
+      } else if (b.review && b.review.isHidden && req.user.role !== "admin") {
         b.review = { isHidden: true, adminModified: b.review.adminModified };
       }
       return b;
@@ -73,8 +72,15 @@ exports.getBooking = async (req, res, next) => {
 
     if (cleanBooking.review && !cleanBooking.review.rating) {
       delete cleanBooking.review;
-    } else if (cleanBooking.review && cleanBooking.review.isHidden && req.user.role !== "admin") {
-      cleanBooking.review = { isHidden: true, adminModified: cleanBooking.review.adminModified };
+    } else if (
+      cleanBooking.review &&
+      cleanBooking.review.isHidden &&
+      req.user.role !== "admin"
+    ) {
+      cleanBooking.review = {
+        isHidden: true,
+        adminModified: cleanBooking.review.adminModified,
+      };
     }
 
     res.status(200).json({
@@ -133,7 +139,9 @@ exports.addBooking = async (req, res, next) => {
 
     req.body.user = req.user.id;
 
-    const numOfNights = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
+    const numOfNights = Math.ceil(
+      (endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24),
+    );
     req.body.totalPrice = numOfNights * campground.pricePerNight;
 
     const booking = await Booking.create(req.body);
@@ -174,7 +182,7 @@ exports.updateBooking = async (req, res, next) => {
     delete req.body.review;
 
     if (req.user.role !== "admin") {
-      delete req.body.user; 
+      delete req.body.user;
       delete req.body.totalPrice;
     }
 
@@ -189,9 +197,11 @@ exports.updateBooking = async (req, res, next) => {
         });
       }
 
-      const numOfNights = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
-      
-      if ( numOfNights > 3 ) {
+      const numOfNights = Math.ceil(
+        (endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24),
+      );
+
+      if (numOfNights > 3) {
         return res.status(400).json({
           success: false,
           message: "Booking duration cannot exceed 3 days",
@@ -316,15 +326,25 @@ exports.getReview = async (req, res, next) => {
     const booking = await Booking.findById(req.params.id)
       .populate({
         path: "campground",
-        select: "name province"
+        select: "name province",
       })
       .populate({
         path: "user",
-        select: "name"
+        select: "name",
       });
 
-    if (!booking || !booking.review || !booking.review.rating || booking.review.isHidden) {
-      return res.status(404).json({ success: false, message: "Review not found or has been deleted" });
+    if (
+      !booking ||
+      !booking.review ||
+      !booking.review.rating ||
+      booking.review.isHidden
+    ) {
+      return res
+        .status(404)
+        .json({
+          success: false,
+          message: "Review not found or has been deleted",
+        });
     }
 
     const reviewData = {
@@ -334,7 +354,7 @@ exports.getReview = async (req, res, next) => {
       adminModified: booking.review.adminModified,
       isHidden: booking.review.isHidden,
       campground: booking.campground,
-      user: booking.user
+      user: booking.user,
     };
 
     res.status(200).json({ success: true, data: reviewData });
@@ -343,7 +363,80 @@ exports.getReview = async (req, res, next) => {
   }
 };
 
+// @desc    Add Review to a Booking
+// @route   POST /api/v1/bookings/:id/review
+// @access  Private
+exports.addReview = async (req, res, next) => {
+  try {
+    const { rating, comment } = req.body;
 
+    if (rating === undefined || rating === null) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Please provide a rating" });
+    }
+
+    if (typeof rating !== "number" || rating < 1 || rating > 5) {
+      return res
+        .status(400)
+        .json({
+          success: false,
+          message: "Rating must be a number between 1 and 5",
+        });
+    }
+
+    const booking = await Booking.findById(req.params.id);
+
+    if (!booking) {
+      return res
+        .status(404)
+        .json({
+          success: false,
+          message: `No Booking with the id of ${req.params.id}`,
+        });
+    }
+
+    if (booking.user.toString() !== req.user.id && req.user.role !== "admin") {
+      return res
+        .status(401)
+        .json({
+          success: false,
+          message: `User ${req.user.id} is not authorized to review this Booking`,
+        });
+    }
+    
+    if (booking.review && booking.review.rating && !booking.review.isHidden) {
+      return res
+        .status(400)
+        .json({ success: false, message: "This booking already has a review" });
+    }
+    
+    if (booking.review && booking.review.adminModified && booking.review.isHidden) {
+      return res
+        .status(403)
+        .json({
+          success: false,
+          message: "This review has been deleted by an admin and cannot be recreated",
+        });
+    }
+
+    booking.review = {
+      rating,
+      comment: comment || "",
+      adminModified: req.user.role === "admin",
+      isHidden: false,
+    };
+
+    await booking.save();
+
+    res.status(201).json({ success: true, data: booking.review });
+  } catch (err) {
+    console.log(err.stack);
+    return res
+      .status(500)
+      .json({ success: false, message: "Cannot add Review" });
+  }
+};
 
 // @desc    Create or Update Review
 // @route   PUT /api/v1/bookings/:id/review
