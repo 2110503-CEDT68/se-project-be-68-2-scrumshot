@@ -365,6 +365,20 @@ exports.updateReview = async (req, res, next) => {
         message: `User ${req.user.id} is not authorized to update this Review`,
       });
     }
+    
+    if (!booking.review || booking.review.isHidden) {
+      return res.status(400).json({
+        success: false,
+        message: "This booking doesn't contain a Review",
+      });
+    }
+
+    if (req.user.role !== "admin" && booking.review?.adminModified) {
+      return res.status(403).json({
+        success: false,
+        message: "This review has been modified by an admin and cannot be updated",
+      });
+    }
 
     const { rating, comment } = req.body;
 
@@ -390,11 +404,12 @@ exports.updateReview = async (req, res, next) => {
       success: true,
       data: booking.review,
     });
+    
   } catch (error) {
     console.log(error);
     return res.status(500).json({
       success: false,
-      message: "Cannot update Review",
+      message: error.message,
     });
   }
 };
