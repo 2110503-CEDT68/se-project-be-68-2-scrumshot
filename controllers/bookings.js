@@ -368,15 +368,16 @@ exports.getReview = async (req, res, next) => {
 // @access  Private
 exports.addReview = async (req, res, next) => {
   try {
+    
     const { rating, comment } = req.body;
-
-    if (rating === undefined || rating === null) {
+    
+    if (!req.body.rating) {
       return res
         .status(400)
         .json({ success: false, message: "Please provide a rating" });
     }
 
-    if (typeof rating !== "number" || rating < 1 || rating > 5) {
+    if (typeof req.body.rating !== "number" || req.body.rating < 1 || req.body.rating > 5) {
       return res
         .status(400)
         .json({
@@ -405,7 +406,8 @@ exports.addReview = async (req, res, next) => {
         });
     }
     
-    if (booking.review && booking.review.rating && !booking.review.isHidden) {
+    
+    if (booking.review && !booking.review.isHidden) {
       return res
         .status(400)
         .json({ success: false, message: "This booking already has a review" });
@@ -422,7 +424,7 @@ exports.addReview = async (req, res, next) => {
 
     booking.review = {
       rating,
-      comment: comment || "",
+      comment: req.body.comment || "",
       adminModified: req.user.role === "admin",
       isHidden: false,
     };

@@ -7,11 +7,8 @@ const {
   deleteBooking,
   getCampgroundReviews,
   getReview,
-<<<<<<< HEAD
   updateReview,
-=======
   addReview,
->>>>>>> add_review
   deleteReview,
 } = require("../controllers/bookings");
 
