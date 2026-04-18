@@ -2,3 +2,6 @@
 node_modules/*
 #ignore config file
 config/config.env
+
+# seriously tho what is wrong with you people
+.vscode 
