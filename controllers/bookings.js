@@ -404,11 +404,20 @@ exports.addReview = async (req, res, next) => {
           message: `User ${req.user.id} is not authorized to review this Booking`,
         });
     }
-
+    
     if (booking.review && booking.review.rating && !booking.review.isHidden) {
       return res
         .status(400)
         .json({ success: false, message: "This booking already has a review" });
+    }
+    
+    if (booking.review && booking.review.adminModified && booking.review.isHidden) {
+      return res
+        .status(403)
+        .json({
+          success: false,
+          message: "This review has been deleted by an admin and cannot be recreated",
+        });
     }
 
     booking.review = {
