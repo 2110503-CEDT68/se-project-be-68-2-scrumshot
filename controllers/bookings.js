@@ -473,7 +473,7 @@ exports.addReview = async (req, res, next) => {
   }
 };
 
-// @desc    Create or Update Review
+// @desc    Update Review
 // @route   PUT /api/v1/bookings/:id/review
 // @access  Private
 exports.updateReview = async (req, res, next) => {
