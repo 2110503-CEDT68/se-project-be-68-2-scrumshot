@@ -428,7 +428,7 @@ exports.addReview = async (req, res, next) => {
         .json({ success: false, message: "This booking already has a review" });
     }
     
-    if (booking.review && booking.review.adminModified && booking.review.isHidden) {
+    if (req.user.role !== "admin" && booking.review && booking.review.adminModified && booking.review.isHidden) {
       return res
         .status(403)
         .json({
