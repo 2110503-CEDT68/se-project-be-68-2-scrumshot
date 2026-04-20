@@ -2,70 +2,50 @@ const Campground = require("../models/Campground");
 const Booking = require("../models/Booking");
 const mongoose = require("mongoose")
 
-// @desc     Get all campgrounds
-// @route    GET /api/v1/campgrounds
-// @access   Public
+// @desc    Get all campgrounds
+// @route   GET /api/v1/campgrounds
+// @access  Public
 exports.getCampgrounds = async (req, res, next) => {
   let query;
-
-  //Copy query
+  
   const reqQuery = { ...req.query };
-  // field to exclude
+
+  let avgRatingFilter = null;
+  if (reqQuery.avgRating) {
+    avgRatingFilter = reqQuery.avgRating; 
+    delete reqQuery.avgRating;
+  }
+
   const removeFields = ["select", "sort", "page", "limit"];
-  // loop over remove field and delete from req query
-
   removeFields.forEach((param) => delete reqQuery[param]);
-  console.log(reqQuery);
 
-  //Create query string
   let queryStr = JSON.stringify(reqQuery);
   queryStr = queryStr.replace(
     /\b(gt|gte|lt|lte|in)\b/g,
     (match) => `$${match}`,
   );
 
-  query = Campground.find(JSON.parse(queryStr)).populate("bookings");
+  const parsedQuery = JSON.parse(queryStr);
+  if (parsedQuery.name) parsedQuery.name = { $regex: parsedQuery.name, $options: 'i' };
+  if (parsedQuery.province) parsedQuery.province = { $regex: parsedQuery.province, $options: 'i' };
+  if (parsedQuery.region) parsedQuery.region = { $regex: parsedQuery.region, $options: 'i' };
 
-  //Select fields
+  query = Campground.find(parsedQuery).populate("bookings");
+
   if (req.query.select) {
     const fields = req.query.select.split(",").join(" ");
     query = query.select(fields);
   }
 
-  //Sort
   if (req.query.sort) {
     const sortBy = req.query.sort.split(",").join(" ");
     query = query.sort(sortBy);
   } else {
     query = query.sort("-createdAt");
   }
-  //Pagination
-  const page = parseInt(req.query.page, 10) || 1;
-  const limit = parseInt(req.query.limit, 10) || 25;
-  const startIndex = (page - 1) * limit;
-  const endIndex = page * limit;
 
   try {
-    const total = await Campground.countDocuments();
-    query = query.skip(startIndex).limit(limit);
-    //Execute query
     const campgrounds = await query;
-
-    //Pagination result
-    const pagination = {};
-    if (endIndex < total) {
-      pagination.next = {
-        page: page + 1,
-        limit,
-      };
-    }
-    if (startIndex > 0) {
-      pagination.prev = {
-        page: page - 1,
-        limit,
-      };
-    }
-
     const campgroundIds = campgrounds.map(camp => camp._id);
 
     const rating = await Booking.aggregate([
@@ -83,9 +63,9 @@ exports.getCampgrounds = async (req, res, next) => {
           totalReviews: { $sum: 1 }
         }
       }
-    ])
+    ]);
 
-    const formattedCampgrounds = campgrounds.map(camp => {
+    let formattedCampgrounds = campgrounds.map(camp => {
       const ratingData = rating.find(r => r._id.toString() === camp._id.toString());
       return {
         ...camp._doc,
@@ -94,9 +74,44 @@ exports.getCampgrounds = async (req, res, next) => {
       };
     });
 
-    res
-      .status(200)
-      .json({ success: true, count: formattedCampgrounds.length, pagination, data: formattedCampgrounds });
+    if (avgRatingFilter) {
+      formattedCampgrounds = formattedCampgrounds.filter(camp => {
+        let isMatch = true;
+        if (avgRatingFilter.gte) isMatch = isMatch && camp.avgRating >= parseFloat(avgRatingFilter.gte);
+        if (avgRatingFilter.gt) isMatch = isMatch && camp.avgRating > parseFloat(avgRatingFilter.gt);
+        if (avgRatingFilter.lte) isMatch = isMatch && camp.avgRating <= parseFloat(avgRatingFilter.lte);
+        if (avgRatingFilter.lt) isMatch = isMatch && camp.avgRating < parseFloat(avgRatingFilter.lt);
+        
+        if (typeof avgRatingFilter === 'string' && !isNaN(avgRatingFilter)) {
+          isMatch = isMatch && camp.avgRating === parseFloat(avgRatingFilter);
+        }
+        return isMatch;
+      });
+    }
+
+    const page = parseInt(req.query.page, 10) || 1;
+    const limit = parseInt(req.query.limit, 10) || 25;
+    const total = formattedCampgrounds.length;
+    const startIndex = (page - 1) * limit;
+    const endIndex = page * limit;
+
+    const paginatedCampgrounds = formattedCampgrounds.slice(startIndex, endIndex);
+
+    const pagination = {};
+    if (endIndex < total) {
+      pagination.next = { page: page + 1, limit };
+    }
+    if (startIndex > 0) {
+      pagination.prev = { page: page - 1, limit };
+    }
+
+    res.status(200).json({ 
+      success: true, 
+      count: paginatedCampgrounds.length, 
+      pagination, 
+      data: paginatedCampgrounds 
+    });
+
   } catch (err) {
     res.status(400).json({ success: false, message: err.message });
   }
