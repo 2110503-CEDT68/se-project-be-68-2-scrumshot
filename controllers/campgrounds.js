@@ -11,7 +11,7 @@ exports.getCampgrounds = async (req, res, next) => {
   //Copy query
   const reqQuery = { ...req.query };
   // field to exclude
-  const removeFields = ["select", "sort", "page", "limit"];
+  const removeFields = ["select", "sort", "page", "limit", "name"];
   // loop over remove field and delete from req query
 
   removeFields.forEach((param) => delete reqQuery[param]);
@@ -24,7 +24,14 @@ exports.getCampgrounds = async (req, res, next) => {
     (match) => `$${match}`,
   );
 
-  query = Campground.find(JSON.parse(queryStr)).populate("bookings");
+  let queryObj = JSON.parse(queryStr);
+
+  // Add fuzzy search for name if provided
+  if (req.query.name) {
+    queryObj.name = { $regex: req.query.name, $options: 'i' };
+  }
+
+  query = Campground.find(queryObj).populate("bookings");
 
   //Select fields
   if (req.query.select) {
