@@ -46,7 +46,7 @@ exports.getCampgrounds = async (req, res, next) => {
     delete reqQuery.maxPrice;
   }
 
-  const removeFields = ["select", "sort", "page", "limit", "sortBy", "sortOrder"];
+  const removeFields = ["select", "sort", "page", "limit", "sortBy", "sortOrder", "name"];
   removeFields.forEach((param) => delete reqQuery[param]);
 
   let queryStr = JSON.stringify(reqQuery);
@@ -61,7 +61,6 @@ exports.getCampgrounds = async (req, res, next) => {
     parsedQuery.pricePerNight = { ...parsedQuery.pricePerNight, ...priceFilter };
   }
 
-  if (parsedQuery.name) parsedQuery.name = { $regex: parsedQuery.name, $options: 'i' };
   if (parsedQuery.region) parsedQuery.region = { $regex: parsedQuery.region, $options: 'i' };
 
   query = Campground.find(parsedQuery).populate("bookings");
@@ -177,13 +176,31 @@ exports.getCampground = async (req, res, next) => {
   }
 };
 
-// @desc     Create new Campground
-// @route    POST /api/v1/campgrounds
-// @access   Private
+// @desc    Create new Campground
+// @route   POST /api/v1/campgrounds
+// @access  Private
 exports.createCampground = async (req, res, next) => {
-  if (req.body.pricePerNight < 0) return res.status(400).json({ success: false, message: "Price per night must be a positive number" });
-  const campground = await Campground.create(req.body);
-  res.status(201).json({ success: true, data: campground });
+  try {
+    if (req.body.pricePerNight < 0) {
+      return res.status(400).json({ 
+        success: false, 
+        message: "Price per night must be a positive number" 
+      });
+    }
+
+    const campground = await Campground.create(req.body);
+    
+    res.status(201).json({ 
+      success: true, 
+      data: campground 
+    });
+
+  } catch (err) {
+    res.status(400).json({ 
+      success: false, 
+      message: err.message 
+    });
+  }
 };
 
 // @desc    Update Campground
