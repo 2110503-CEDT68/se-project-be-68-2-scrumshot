@@ -1,80 +1,107 @@
 const Campground = require("../models/Campground");
 const Booking = require("../models/Booking");
-const mongoose = require("mongoose")
+const mongoose = require("mongoose");
 
 // @desc     Get all campgrounds
 // @route    GET /api/v1/campgrounds
 // @access   Public
 exports.getCampgrounds = async (req, res, next) => {
-  let query;
-
-  //Copy query
-  const reqQuery = { ...req.query };
-  // field to exclude
-  const removeFields = ["select", "sort", "page", "limit", "name"];
-  // loop over remove field and delete from req query
-
-  removeFields.forEach((param) => delete reqQuery[param]);
-  console.log(reqQuery);
-
-  //Create query string
-  let queryStr = JSON.stringify(reqQuery);
-  queryStr = queryStr.replace(
-    /\b(gt|gte|lt|lte|in)\b/g,
-    (match) => `$${match}`,
-  );
-
-  let queryObj = JSON.parse(queryStr);
-
-  // Add fuzzy search for name if provided
-  if (req.query.name) {
-    queryObj.name = { $regex: req.query.name, $options: 'i' };
-  }
-
-  query = Campground.find(queryObj).populate("bookings");
-
-  //Select fields
-  if (req.query.select) {
-    const fields = req.query.select.split(",").join(" ");
-    query = query.select(fields);
-  }
-
-  //Sort
-  if (req.query.sort) {
-    const sortBy = req.query.sort.split(",").join(" ");
-    query = query.sort(sortBy);
-  } else {
-    query = query.sort("-createdAt");
-  }
-  //Pagination
+  const searchTerm = req.query.name;
+  const hasCustomSort = req.query.sort;
   const page = parseInt(req.query.page, 10) || 1;
   const limit = parseInt(req.query.limit, 10) || 25;
   const startIndex = (page - 1) * limit;
   const endIndex = page * limit;
 
+  //Copy query and prepare filter
+  const reqQuery = { ...req.query };
+  const removeFields = ["select", "sort", "page", "limit", "name"];
+  removeFields.forEach((param) => delete reqQuery[param]);
+
+  //Create query string for additional filters
+  let queryStr = JSON.stringify(reqQuery);
+  queryStr = queryStr.replace(
+    /\b(gt|gte|lt|lte|in)\b/g,
+    (match) => `$${match}`,
+  );
+  let additionalFilters = JSON.parse(queryStr);
+
   try {
-    const total = await Campground.countDocuments();
-    query = query.skip(startIndex).limit(limit);
-    //Execute query
-    const campgrounds = await query;
+    // Build aggregation pipeline
+    let pipeline = [];
 
-    //Pagination result
-    const pagination = {};
-    if (endIndex < total) {
-      pagination.next = {
-        page: page + 1,
-        limit,
-      };
-    }
-    if (startIndex > 0) {
-      pagination.prev = {
-        page: page - 1,
-        limit,
-      };
+    // Stage 1: Use MongoDB Atlas fuzzy search if search term provided
+    if (searchTerm && !hasCustomSort) {
+      pipeline.push({
+        $search: {
+          text: {
+            query: searchTerm,
+            path: "name",
+            fuzzy: {
+              maxEdits: 2
+            }
+          }
+        }
+      });
+      // Add score for sorting by relevance
+      pipeline.push({
+        $addFields: {
+          searchScore: { $meta: "searchScore" }
+        }
+      });
     }
 
+    // Stage 2: Apply additional filters
+    if (Object.keys(additionalFilters).length > 0) {
+      pipeline.push({ $match: additionalFilters });
+    }
+
+    // Stage 3: Sort
+    if (hasCustomSort) {
+      const sortBy = hasCustomSort.split(",").reduce((acc, field) => {
+        const trimmed = field.trim();
+        acc[trimmed.startsWith('-') ? trimmed.slice(1) : trimmed] = trimmed.startsWith('-') ? -1 : 1;
+        return acc;
+      }, {});
+      pipeline.push({ $sort: sortBy });
+    } else if (searchTerm) {
+      // Sort by search score descending, then by createdAt descending
+      pipeline.push({
+        $sort: {
+          searchScore: -1,
+          createdAt: -1
+        }
+      });
+    } else {
+      // Default: sort by createdAt descending
+      pipeline.push({ $sort: { createdAt: -1 } });
+    }
+
+    // Stage 4: Count total before pagination
+    let countPipeline = [...pipeline];
+    countPipeline.push({ $count: "total" });
+    const countResult = await Campground.aggregate(countPipeline);
+    const total = countResult.length > 0 ? countResult[0].total : 0;
+
+    // Stage 5: Pagination
+    pipeline.push({ $skip: startIndex });
+    pipeline.push({ $limit: limit });
+
+    // Stage 6: Populate bookings (lookup)
+    pipeline.push({
+      $lookup: {
+        from: "bookings",
+        localField: "_id",
+        foreignField: "campground",
+        as: "bookings"
+      }
+    });
+
+    // Execute aggregation
+    const campgrounds = await Campground.aggregate(pipeline);
+
+    // Get ratings
     const campgroundIds = campgrounds.map(camp => camp._id);
-
     const rating = await Booking.aggregate([
       {
         $match: {
@@ -90,16 +117,32 @@ exports.getCampgrounds = async (req, res, next) => {
           totalReviews: { $sum: 1 }
         }
       }
-    ])
+    ]);
 
+    // Format response
     const formattedCampgrounds = campgrounds.map(camp => {
       const ratingData = rating.find(r => r._id.toString() === camp._id.toString());
       return {
-        ...camp._doc,
+        ...camp,
         avgRating: ratingData ? Math.round(ratingData.avgRating * 10) / 10 : 0,
         totalReviews: ratingData ? ratingData.totalReviews : 0
       };
     });
+
+    // Pagination result
+    const pagination = {};
+    if (endIndex < total) {
+      pagination.next = {
+        page: page + 1,
+        limit,
+      };
+    }
+    if (startIndex > 0) {
+      pagination.prev = {
+        page: page - 1,
+        limit,
+      };
+    }
 
     res
       .status(200)
