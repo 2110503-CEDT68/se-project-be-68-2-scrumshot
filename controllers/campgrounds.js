@@ -202,7 +202,7 @@ exports.deleteCampground = async (req, res, next) => {
     if (activeBookings.length > 0) {
       return res.status(400).json({
         success: false,
-        activeBookingsCount: activeBookings.length
+        message: `Cannot delete campground with ${activeBookings.length} active booking(s). Please cancel all active bookings first.`,
       });
     }
 
