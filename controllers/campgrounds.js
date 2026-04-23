@@ -6,17 +6,47 @@ const mongoose = require("mongoose")
 // @route   GET /api/v1/campgrounds
 // @access  Public
 exports.getCampgrounds = async (req, res, next) => {
-  let query;
+  const validRegions = ["Northern", "Northeastern", "Western", "Central", "Eastern", "South"];
   
+  if (req.query.region) {
+    const isValid = validRegions.find(r => r.toLowerCase() === req.query.region.toLowerCase());
+    
+    if (!isValid) {
+      return res.status(400).json({
+        success: false,
+        message: `Invalid region. Allowed values are: ${validRegions.join(', ')}`
+      });
+    }
+    req.query.region = isValid;
+  }
+
+  let query;
+
   const reqQuery = { ...req.query };
 
   let avgRatingFilter = null;
-  if (reqQuery.avgRating) {
-    avgRatingFilter = reqQuery.avgRating; 
-    delete reqQuery.avgRating;
+  if (reqQuery.minRating || reqQuery.maxRating) {
+    avgRatingFilter = {};
+    if (reqQuery.minRating) avgRatingFilter.gte = parseFloat(reqQuery.minRating);
+    if (reqQuery.maxRating) avgRatingFilter.lte = parseFloat(reqQuery.maxRating);
+    delete reqQuery.minRating;
+    delete reqQuery.maxRating;
   }
 
-  const removeFields = ["select", "sort", "page", "limit"];
+  let priceFilter = {};
+  let hasPriceFilter = false;
+  if (reqQuery.minPrice) {
+    priceFilter.$gte = parseFloat(reqQuery.minPrice);
+    hasPriceFilter = true;
+    delete reqQuery.minPrice;
+  }
+  if (reqQuery.maxPrice) {
+    priceFilter.$lte = parseFloat(reqQuery.maxPrice);
+    hasPriceFilter = true;
+    delete reqQuery.maxPrice;
+  }
+
+  const removeFields = ["select", "sort", "page", "limit", "sortBy", "sortOrder"];
   removeFields.forEach((param) => delete reqQuery[param]);
 
   let queryStr = JSON.stringify(reqQuery);
@@ -26,8 +56,12 @@ exports.getCampgrounds = async (req, res, next) => {
   );
 
   const parsedQuery = JSON.parse(queryStr);
+
+  if (hasPriceFilter) {
+    parsedQuery.pricePerNight = { ...parsedQuery.pricePerNight, ...priceFilter };
+  }
+
   if (parsedQuery.name) parsedQuery.name = { $regex: parsedQuery.name, $options: 'i' };
-  if (parsedQuery.province) parsedQuery.province = { $regex: parsedQuery.province, $options: 'i' };
   if (parsedQuery.region) parsedQuery.region = { $regex: parsedQuery.region, $options: 'i' };
 
   query = Campground.find(parsedQuery).populate("bookings");
@@ -37,12 +71,7 @@ exports.getCampgrounds = async (req, res, next) => {
     query = query.select(fields);
   }
 
-  if (req.query.sort) {
-    const sortBy = req.query.sort.split(",").join(" ");
-    query = query.sort(sortBy);
-  } else {
-    query = query.sort("-createdAt");
-  }
+  query = query.sort("-createdAt");
 
   try {
     const campgrounds = await query;
@@ -77,28 +106,21 @@ exports.getCampgrounds = async (req, res, next) => {
     if (avgRatingFilter) {
       formattedCampgrounds = formattedCampgrounds.filter(camp => {
         let isMatch = true;
-        if (avgRatingFilter.gte) isMatch = isMatch && camp.avgRating >= parseFloat(avgRatingFilter.gte);
-        if (avgRatingFilter.gt) isMatch = isMatch && camp.avgRating > parseFloat(avgRatingFilter.gt);
-        if (avgRatingFilter.lte) isMatch = isMatch && camp.avgRating <= parseFloat(avgRatingFilter.lte);
-        if (avgRatingFilter.lt) isMatch = isMatch && camp.avgRating < parseFloat(avgRatingFilter.lt);
-        
-        if (typeof avgRatingFilter === 'string' && !isNaN(avgRatingFilter)) {
-          isMatch = isMatch && camp.avgRating === parseFloat(avgRatingFilter);
-        }
+        if (avgRatingFilter.gte !== undefined) isMatch = isMatch && camp.avgRating >= avgRatingFilter.gte;
+        if (avgRatingFilter.lte !== undefined) isMatch = isMatch && camp.avgRating <= avgRatingFilter.lte;
         return isMatch;
       });
     }
 
+    const limit = parseInt(req.query.limit, 10) || formattedCampgrounds.length;
     const page = parseInt(req.query.page, 10) || 1;
-    const limit = parseInt(req.query.limit, 10) || 25;
-    const total = formattedCampgrounds.length;
     const startIndex = (page - 1) * limit;
     const endIndex = page * limit;
 
     const paginatedCampgrounds = formattedCampgrounds.slice(startIndex, endIndex);
 
     const pagination = {};
-    if (endIndex < total) {
+    if (endIndex < formattedCampgrounds.length) {
       pagination.next = { page: page + 1, limit };
     }
     if (startIndex > 0) {
