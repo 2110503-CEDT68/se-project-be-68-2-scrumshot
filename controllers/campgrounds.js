@@ -188,7 +188,7 @@ exports.deleteCampground = async (req, res, next) => {
     }
 
     if (req.user.role !== "admin") {
-      return res.status(401).json({
+      return res.status(403).json({
         success: false,
         message: `User ${req.user.id} is not authorized to delete this Campground`,
       });
@@ -202,7 +202,6 @@ exports.deleteCampground = async (req, res, next) => {
     if (activeBookings.length > 0) {
       return res.status(400).json({
         success: false,
-        message: `Cannot delete campground with ${activeBookings.length} active booking(s). Please cancel all active bookings first.`,
         activeBookingsCount: activeBookings.length
       });
     }
