@@ -187,7 +187,25 @@ exports.deleteCampground = async (req, res, next) => {
       });
     }
 
-    await Booking.deleteMany({ campground: req.params.id });
+    if (req.user.role !== "admin") {
+      return res.status(403).json({
+        success: false,
+        message: `User ${req.user.id} is not authorized to delete this Campground`,
+      });
+    }
+
+    const activeBookings = await Booking.find({
+      campground: req.params.id,
+      bookEndDate: { $gte: new Date() }
+    });
+
+    if (activeBookings.length > 0) {
+      return res.status(400).json({
+        success: false,
+        message: `Cannot delete campground with ${activeBookings.length} active booking(s). Please cancel all active bookings first.`,
+      });
+    }
+
     await Campground.deleteOne({ _id: req.params.id });
 
     res.status(200).json({ success: true, data: {} });
