@@ -13,6 +13,8 @@ exports.getCampgrounds = async (req, res, next) => {
   const startIndex = (page - 1) * limit;
   const endIndex = page * limit;
 
+  console.log("Received query parameters:", req.query);
+
   //Copy query and prepare filter
   const reqQuery = { ...req.query };
   const removeFields = ["select", "sort", "page", "limit", "name"];
@@ -34,11 +36,13 @@ exports.getCampgrounds = async (req, res, next) => {
     if (searchTerm && !hasCustomSort) {
       pipeline.push({
         $search: {
-          text: {
+          index: "nameSearchIndex",
+          autocomplete: {
             query: searchTerm,
             path: "name",
             fuzzy: {
-              maxEdits: 2
+              maxEdits: 2,
+              prefixLength: 0   // Allows fuzzy matching even on the first letter
             }
           }
         }
