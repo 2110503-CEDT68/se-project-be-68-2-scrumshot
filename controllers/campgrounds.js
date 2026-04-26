@@ -2,10 +2,24 @@ const Campground = require("../models/Campground");
 const Booking = require("../models/Booking");
 const mongoose = require("mongoose");
 
-// @desc     Get all campgrounds
-// @route    GET /api/v1/campgrounds
-// @access   Public
+// @desc    Get all campgrounds
+// @route   GET /api/v1/campgrounds
+// @access  Public
 exports.getCampgrounds = async (req, res, next) => {
+  const validRegions = ["Northern", "Northeastern", "Western", "Central", "Eastern", "South"];
+
+  if (req.query.region) {
+    const isValid = validRegions.find(r => r.toLowerCase() === req.query.region.toLowerCase());
+
+    if (!isValid) {
+      return res.status(400).json({
+        success: false,
+        message: `Invalid region. Allowed values are: ${validRegions.join(', ')}`
+      });
+    }
+    req.query.region = isValid;
+  }
+
   const searchTerm = req.query.name;
   const hasCustomSort = req.query.sort;
   const page = parseInt(req.query.page, 10) || 1;
@@ -17,7 +31,30 @@ exports.getCampgrounds = async (req, res, next) => {
 
   //Copy query and prepare filter
   const reqQuery = { ...req.query };
-  const removeFields = ["select", "sort", "page", "limit", "name"];
+
+  let avgRatingFilter = null;
+  if (reqQuery.minRating || reqQuery.maxRating) {
+    avgRatingFilter = {};
+    if (reqQuery.minRating) avgRatingFilter.gte = parseFloat(reqQuery.minRating);
+    if (reqQuery.maxRating) avgRatingFilter.lte = parseFloat(reqQuery.maxRating);
+    delete reqQuery.minRating;
+    delete reqQuery.maxRating;
+  }
+
+  let priceFilter = {};
+  let hasPriceFilter = false;
+  if (reqQuery.minPrice) {
+    priceFilter.$gte = parseFloat(reqQuery.minPrice);
+    hasPriceFilter = true;
+    delete reqQuery.minPrice;
+  }
+  if (reqQuery.maxPrice) {
+    priceFilter.$lte = parseFloat(reqQuery.maxPrice);
+    hasPriceFilter = true;
+    delete reqQuery.maxPrice;
+  }
+
+  const removeFields = ["select", "sort", "page", "limit", "sortBy", "sortOrder", "name"];
   removeFields.forEach((param) => delete reqQuery[param]);
 
   //Create query string for additional filters
@@ -27,6 +64,12 @@ exports.getCampgrounds = async (req, res, next) => {
     (match) => `$${match}`,
   );
   let additionalFilters = JSON.parse(queryStr);
+
+  if (hasPriceFilter) {
+    additionalFilters.pricePerNight = { ...additionalFilters.pricePerNight, ...priceFilter };
+  }
+
+  if (additionalFilters.region) additionalFilters.region = { $regex: additionalFilters.region, $options: 'i' };
 
   try {
     // Build aggregation pipeline
@@ -124,7 +167,7 @@ exports.getCampgrounds = async (req, res, next) => {
     ]);
 
     // Format response
-    const formattedCampgrounds = campgrounds.map(camp => {
+    let formattedCampgrounds = campgrounds.map(camp => {
       const ratingData = rating.find(r => r._id.toString() === camp._id.toString());
       return {
         ...camp,
@@ -132,6 +175,15 @@ exports.getCampgrounds = async (req, res, next) => {
         totalReviews: ratingData ? ratingData.totalReviews : 0
       };
     });
+
+    if (avgRatingFilter) {
+      formattedCampgrounds = formattedCampgrounds.filter(camp => {
+        let isMatch = true;
+        if (avgRatingFilter.gte !== undefined) isMatch = isMatch && camp.avgRating >= avgRatingFilter.gte;
+        if (avgRatingFilter.lte !== undefined) isMatch = isMatch && camp.avgRating <= avgRatingFilter.lte;
+        return isMatch;
+      });
+    }
 
     // Pagination result
     const pagination = {};
@@ -194,13 +246,31 @@ exports.getCampground = async (req, res, next) => {
   }
 };
 
-// @desc     Create new Campground
-// @route    POST /api/v1/campgrounds
-// @access   Private
+// @desc    Create new Campground
+// @route   POST /api/v1/campgrounds
+// @access  Private
 exports.createCampground = async (req, res, next) => {
-  if (req.body.pricePerNight < 0) return res.status(400).json({ success: false, message: "Price per night must be a positive number" });
-  const campground = await Campground.create(req.body);
-  res.status(201).json({ success: true, data: campground });
+  try {
+    if (req.body.pricePerNight < 0) {
+      return res.status(400).json({ 
+        success: false, 
+        message: "Price per night must be a positive number" 
+      });
+    }
+
+    const campground = await Campground.create(req.body);
+    
+    res.status(201).json({ 
+      success: true, 
+      data: campground 
+    });
+
+  } catch (err) {
+    res.status(400).json({ 
+      success: false, 
+      message: err.message 
+    });
+  }
 };
 
 // @desc    Update Campground
