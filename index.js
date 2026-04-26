@@ -22,9 +22,25 @@ connectDB();
 
 const app = express();
 
+function sanitizeKeysOnly(data) {
+  if (Array.isArray(data)) {
+    return data.map(sanitizeKeysOnly);
+  }
+
+  if (data && typeof data === "object" && data.constructor === Object) {
+    return Object.entries(data).reduce((acc, [key, value]) => {
+      const sanitizedKey = key.replace(/[.$]/g, "");
+      acc[sanitizedKey] = sanitizeKeysOnly(value);
+      return acc;
+    }, {});
+  }
+
+  return data;
+}
+
 app.use(express.json());
 app.use(cookieParser());
-app.use(mongoSanitize());
+app.use(mongoSanitize({ customSanitizer: sanitizeKeysOnly }));
 app.use(helmet());
 // app.use(xss()); // This doesn't allow us to put links inside our campgrounds
 // app.use(hpp());
