@@ -8,16 +8,25 @@ const mongoose = require("mongoose");
 exports.getCampgrounds = async (req, res, next) => {
   const validRegions = ["Northern", "Northeastern", "Western", "Central", "Eastern", "South"];
 
-  if (req.query.region) {
-    const isValid = validRegions.find(r => r.toLowerCase() === req.query.region.toLowerCase());
+  // รวม region[] และ region เข้าด้วยกัน
+  const rawRegion = req.query.region;
+  delete req.query.region;
 
-    if (!isValid) {
+  let regionFilter = null;
+  if (rawRegion) {
+    const regions = Array.isArray(rawRegion) ? rawRegion : [rawRegion];
+    const validatedRegions = regions
+      .map(r => validRegions.find(v => v.toLowerCase() === r.toLowerCase()))
+      .filter(Boolean);
+
+    if (validatedRegions.length === 0) {
       return res.status(400).json({
         success: false,
         message: `Invalid region. Allowed values are: ${validRegions.join(', ')}`
       });
     }
-    req.query.region = isValid;
+
+    regionFilter = { $in: validatedRegions };
   }
 
   const searchTerm = req.query.name;
@@ -29,7 +38,6 @@ exports.getCampgrounds = async (req, res, next) => {
 
   console.log("Received query parameters:", req.query);
 
-  //Copy query and prepare filter
   const reqQuery = { ...req.query };
 
   let avgRatingFilter = null;
@@ -57,25 +65,24 @@ exports.getCampgrounds = async (req, res, next) => {
   const removeFields = ["select", "sort", "page", "limit", "sortBy", "sortOrder", "name"];
   removeFields.forEach((param) => delete reqQuery[param]);
 
-  //Create query string for additional filters
   let queryStr = JSON.stringify(reqQuery);
-  queryStr = queryStr.replace(
-    /\b(gt|gte|lt|lte|in)\b/g,
-    (match) => `$${match}`,
-  );
+  queryStr = queryStr.replace(/\b(gt|gte|lt|lte|in)\b/g, (match) => `$${match}`);
   let additionalFilters = JSON.parse(queryStr);
 
   if (hasPriceFilter) {
     additionalFilters.pricePerNight = { ...additionalFilters.pricePerNight, ...priceFilter };
   }
 
-  if (additionalFilters.region) additionalFilters.region = { $regex: additionalFilters.region, $options: 'i' };
-
+  // ใส่ regionFilter แยกต่างหาก ไม่ผ่าน JSON.stringify
+  if (regionFilter) {
+    additionalFilters.region = regionFilter;
+  }
+  console.log("rawRegion:", rawRegion);
+console.log("regionFilter:", regionFilter);
+console.log("additionalFilters:", JSON.stringify(additionalFilters));
   try {
-    // Build aggregation pipeline
     let pipeline = [];
 
-    // Stage 1: Use MongoDB Atlas fuzzy search if search term provided
     if (searchTerm && !hasCustomSort) {
       pipeline.push({
         $search: {
@@ -83,27 +90,17 @@ exports.getCampgrounds = async (req, res, next) => {
           autocomplete: {
             query: searchTerm,
             path: "name",
-            fuzzy: {
-              maxEdits: 2,
-              prefixLength: 0   // Allows fuzzy matching even on the first letter
-            }
+            fuzzy: { maxEdits: 2, prefixLength: 0 }
           }
         }
       });
-      // Add score for sorting by relevance
-      pipeline.push({
-        $addFields: {
-          searchScore: { $meta: "searchScore" }
-        }
-      });
+      pipeline.push({ $addFields: { searchScore: { $meta: "searchScore" } } });
     }
 
-    // Stage 2: Apply additional filters
     if (Object.keys(additionalFilters).length > 0) {
       pipeline.push({ $match: additionalFilters });
     }
 
-    // Stage 3: Sort
     if (hasCustomSort) {
       const sortBy = hasCustomSort.split(",").reduce((acc, field) => {
         const trimmed = field.trim();
@@ -112,29 +109,18 @@ exports.getCampgrounds = async (req, res, next) => {
       }, {});
       pipeline.push({ $sort: sortBy });
     } else if (searchTerm) {
-      // Sort by search score descending, then by createdAt descending
-      pipeline.push({
-        $sort: {
-          searchScore: -1,
-          createdAt: -1
-        }
-      });
+      pipeline.push({ $sort: { searchScore: -1, createdAt: -1 } });
     } else {
-      // Default: sort by createdAt descending
       pipeline.push({ $sort: { createdAt: -1 } });
     }
 
-    // Stage 4: Count total before pagination
     let countPipeline = [...pipeline];
     countPipeline.push({ $count: "total" });
     const countResult = await Campground.aggregate(countPipeline);
     const total = countResult.length > 0 ? countResult[0].total : 0;
 
-    // Stage 5: Pagination
     pipeline.push({ $skip: startIndex });
     pipeline.push({ $limit: limit });
-
-    // Stage 6: Populate bookings (lookup)
     pipeline.push({
       $lookup: {
         from: "bookings",
@@ -144,10 +130,8 @@ exports.getCampgrounds = async (req, res, next) => {
       }
     });
 
-    // Execute aggregation
     const campgrounds = await Campground.aggregate(pipeline);
 
-    // Get ratings
     const campgroundIds = campgrounds.map(camp => camp._id);
     const rating = await Booking.aggregate([
       {
@@ -166,7 +150,6 @@ exports.getCampgrounds = async (req, res, next) => {
       }
     ]);
 
-    // Format response
     let formattedCampgrounds = campgrounds.map(camp => {
       const ratingData = rating.find(r => r._id.toString() === camp._id.toString());
       return {
@@ -185,24 +168,11 @@ exports.getCampgrounds = async (req, res, next) => {
       });
     }
 
-    // Pagination result
     const pagination = {};
-    if (endIndex < total) {
-      pagination.next = {
-        page: page + 1,
-        limit,
-      };
-    }
-    if (startIndex > 0) {
-      pagination.prev = {
-        page: page - 1,
-        limit,
-      };
-    }
+    if (endIndex < total) pagination.next = { page: page + 1, limit };
+    if (startIndex > 0) pagination.prev = { page: page - 1, limit };
 
-    res
-      .status(200)
-      .json({ success: true, count: formattedCampgrounds.length, pagination, data: formattedCampgrounds });
+    res.status(200).json({ success: true, count: formattedCampgrounds.length, pagination, data: formattedCampgrounds });
   } catch (err) {
     res.status(400).json({ success: false, message: err.message });
   }
@@ -215,7 +185,7 @@ exports.getCampground = async (req, res, next) => {
   try {
     const campground = await Campground.findById(req.params.id);
     if (!campground) return res.status(400).json({ success: false, message: "Campground not found" });
-    
+
     const ratingData = await Booking.aggregate([
       {
         $match: {
@@ -234,13 +204,9 @@ exports.getCampground = async (req, res, next) => {
     ]);
 
     const avgRating = ratingData.length > 0 ? Math.round(ratingData[0].avgRating * 10) / 10 : 0;
-    const totalReviews = ratingData.length > 0 ? ratingData[0].totalReviews : 0;  
+    const totalReviews = ratingData.length > 0 ? ratingData[0].totalReviews : 0;
 
-    res.status(200).json({ success: true, data: {
-        ...campground._doc,
-        avgRating,
-        totalReviews
-      } });
+    res.status(200).json({ success: true, data: { ...campground._doc, avgRating, totalReviews } });
   } catch (err) {
     res.status(400).json({ success: false, message: err.message });
   }
@@ -252,24 +218,15 @@ exports.getCampground = async (req, res, next) => {
 exports.createCampground = async (req, res, next) => {
   try {
     if (req.body.pricePerNight < 0) {
-      return res.status(400).json({ 
-        success: false, 
-        message: "Price per night must be a positive number" 
+      return res.status(400).json({
+        success: false,
+        message: "Price per night must be a positive number"
       });
     }
-
     const campground = await Campground.create(req.body);
-    
-    res.status(201).json({ 
-      success: true, 
-      data: campground 
-    });
-
+    res.status(201).json({ success: true, data: campground });
   } catch (err) {
-    res.status(400).json({ 
-      success: false, 
-      message: err.message 
-    });
+    res.status(400).json({ success: false, message: err.message });
   }
 };
 
@@ -278,19 +235,11 @@ exports.createCampground = async (req, res, next) => {
 // @access  Private
 exports.updateCampground = async (req, res, next) => {
   try {
-    const campground = await Campground.findByIdAndUpdate(
-      req.params.id,
-      req.body,
-      {
-        new: true,
-        runValidators: true,
-      },
-    );
-
-    if (!campground) {
-      return res.status(400).json({ success: false });
-    }
-
+    const campground = await Campground.findByIdAndUpdate(req.params.id, req.body, {
+      new: true,
+      runValidators: true,
+    });
+    if (!campground) return res.status(400).json({ success: false });
     res.status(200).json({ success: true, data: campground });
   } catch (err) {
     res.status(400).json({ success: false, message: err.message });
@@ -331,7 +280,6 @@ exports.deleteCampground = async (req, res, next) => {
     }
 
     await Campground.deleteOne({ _id: req.params.id });
-
     res.status(200).json({ success: true, data: {} });
   } catch (err) {
     res.status(400).json({ success: false, message: err.message });
