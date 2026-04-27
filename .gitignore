@@ -8,3 +8,5 @@ config/config.env
 
 
 .DS_Store
+
+coverage
