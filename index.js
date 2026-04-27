@@ -24,7 +24,7 @@ const app = express();
 
 app.use(express.json());
 app.use(cookieParser());
-app.use(mongoSanitize());
+// app.use(mongoSanitize());
 app.use(helmet());
 // app.use(xss()); // This doesn't allow us to put links inside our campgrounds
 // app.use(hpp());
