@@ -6,7 +6,7 @@ config/config.env
 # seriously tho what is wrong with you people
 .vscode 
 
-
+.env
 .DS_Store
 
 coverage
