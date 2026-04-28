@@ -16,10 +16,33 @@ const {
  * @swagger
  * components:
  *   schemas:
+ *     Review:
+ *       type: object
+ *       properties:
+ *         rating:
+ *           type: number
+ *           minimum: 1
+ *           maximum: 5
+ *           description: Rating from 1 to 5
+ *         comment:
+ *           type: string
+ *           description: Review comment
+ *         adminModified:
+ *           type: boolean
+ *           description: Whether the review was modified by an admin
+ *         isHidden:
+ *           type: boolean
+ *           description: Whether the review is hidden
+ *         createdAt:
+ *           type: string
+ *           format: date-time
+ *           description: Review creation date
  *     Booking:
  *       type: object
  *       required:
  *         - bookDate
+ *         - bookEndDate
+ *         - totalPrice
  *       properties:
  *         id:
  *           type: string
@@ -28,7 +51,11 @@ const {
  *         bookDate:
  *           type: string
  *           format: date
- *           description: Date of the booking
+ *           description: Start date of the booking
+ *         bookEndDate:
+ *           type: string
+ *           format: date
+ *           description: End date of the booking
  *         user:
  *           type: string
  *           format: uuid
@@ -37,6 +64,11 @@ const {
  *           type: string
  *           format: uuid
  *           description: Campground ID
+ *         totalPrice:
+ *           type: number
+ *           description: Total price of the booking
+ *         review:
+ *           $ref: '#/components/schemas/Review'
  *         createdAt:
  *           type: string
  *           format: date-time
@@ -44,8 +76,13 @@ const {
  *       example:
  *         id: 609bda561452242d88d36e37
  *         bookDate: "2024-03-01T00:00:00.000Z"
+ *         bookEndDate: "2024-03-03T00:00:00.000Z"
  *         user: 609bda561452242d88d36e38
  *         campground: 609bda561452242d88d36e39
+ *         totalPrice: 1500
+ *         review:
+ *           rating: 5
+ *           comment: "Great experience!"
  *         createdAt: "2024-03-01T00:00:00.000Z"
  * tags:
  *   name: Bookings
@@ -178,6 +215,101 @@ const {
  *         description: The booking was deleted
  *       404:
  *         description: The booking was not found
+ * /bookings/{id}/review:
+ *   get:
+ *     summary: Get the review for a specific booking
+ *     tags: [Bookings]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         schema:
+ *           type: string
+ *         required: true
+ *         description: The booking id
+ *     responses:
+ *       200:
+ *         description: The review details
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Review'
+ *       404:
+ *         description: Review not found
+ *   post:
+ *     summary: Add a review to a booking
+ *     tags: [Bookings]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         schema:
+ *           type: string
+ *         required: true
+ *         description: The booking id
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - rating
+ *             properties:
+ *               rating:
+ *                 type: number
+ *                 minimum: 1
+ *                 maximum: 5
+ *               comment:
+ *                 type: string
+ *     responses:
+ *       201:
+ *         description: Review added successfully
+ *       400:
+ *         description: Invalid input or review already exists
+ *   put:
+ *     summary: Update a review
+ *     tags: [Bookings]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         schema:
+ *           type: string
+ *         required: true
+ *         description: The booking id
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               rating:
+ *                 type: number
+ *                 minimum: 1
+ *                 maximum: 5
+ *               comment:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Review updated successfully
+ *   delete:
+ *     summary: Delete a review
+ *     tags: [Bookings]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         schema:
+ *           type: string
+ *         required: true
+ *         description: The booking id
+ *     responses:
+ *       200:
+ *         description: Review deleted successfully
  */
 
 const router = express.Router({ mergeParams: true });
