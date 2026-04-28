@@ -168,6 +168,26 @@ const {
  *         description: The Campground was deleted
  *       404:
  *         description: The Campground was not found
+ * /campgrounds/{campgroundId}/reviews:
+ *   get:
+ *     summary: Get all reviews for a specific campground
+ *     tags: [Campgrounds]
+ *     parameters:
+ *       - in: path
+ *         name: campgroundId
+ *         schema:
+ *           type: string
+ *         required: true
+ *         description: The campground id
+ *     responses:
+ *       200:
+ *         description: List of reviews
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 $ref: '#/components/schemas/Review'
  */
 
 const bookingRouter = require("./bookings");

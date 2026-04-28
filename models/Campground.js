@@ -45,7 +45,7 @@ const CampgroundSchema = new mongoose.Schema(
       type: String,
       required: [true, "Please add a picture"],
     },
-    createdAt: {
+  createdAt: {
       type: Date,
       default: Date.now,
     },
