@@ -260,19 +260,9 @@ exports.deleteCampground = async (req, res, next) => {
       });
     }
 
-    const activeBookings = await Booking.find({
-      campground: req.params.id,
-      bookEndDate: { $gte: new Date() }
-    });
-
-    if (activeBookings.length > 0) {
-      return res.status(400).json({
-        success: false,
-        message: `Cannot delete campground with ${activeBookings.length} active booking(s). Please cancel all active bookings first.`,
-      });
-    }
-
+    await Booking.deleteMany({ campground: req.params.id });
     await Campground.deleteOne({ _id: req.params.id });
+
     res.status(200).json({ success: true, data: {} });
   } catch (err) {
     res.status(400).json({ success: false, message: err.message });
