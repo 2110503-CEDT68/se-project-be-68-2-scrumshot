@@ -78,23 +78,43 @@ exports.getCampgrounds = async (req, res, next) => {
     additionalFilters.region = regionFilter;
   }
   console.log("rawRegion:", rawRegion);
-console.log("regionFilter:", regionFilter);
-console.log("additionalFilters:", JSON.stringify(additionalFilters));
+  console.log("regionFilter:", regionFilter);
+  console.log("additionalFilters:", JSON.stringify(additionalFilters));
   try {
     let pipeline = [];
 
     if (searchTerm && !hasCustomSort) {
       pipeline.push({
         $search: {
-          index: "nameSearchIndex",
-          autocomplete: {
-            query: searchTerm,
-            path: "name",
-            fuzzy: { maxEdits: 2, prefixLength: 0 }
+          index: "nameSearchIndex2", 
+          compound: {
+            should: [
+              // AC 1a & 1b: Exact and Substring match
+              {
+                autocomplete: {
+                  query: searchTerm,
+                  path: "name", // REVERTED BACK TO "name"
+                  score: { boost: { value: 5 } } 
+                }
+              },
+              // AC 1c: Fuzzy typo matching (Max 2 edits)
+              {
+                text: {
+                  query: searchTerm,
+                  path: "name", // REMAINS "name"
+                  fuzzy: { maxEdits: 2, prefixLength: 0 }
+                }
+              }
+            ],
+            minimumShouldMatch: 1
           }
         }
       });
+      
       pipeline.push({ $addFields: { searchScore: { $meta: "searchScore" } } });
+      
+      // AC 2: Drop irrelevant garbage
+      pipeline.push({ $match: { searchScore: { $gte: 1.0 } } }); 
     }
 
     if (Object.keys(additionalFilters).length > 0) {
