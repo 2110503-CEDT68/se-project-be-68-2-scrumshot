@@ -1,7 +1,7 @@
 const Campground = require('../models/Campground');
 const Booking = require('../models/Booking');
 
-const campgrounds = require('./campgrounds');
+const campgrounds = require('../controllers/campgrounds');
 
 jest.mock('../models/Campground');
 jest.mock('../models/Booking');
@@ -14,7 +14,7 @@ describe("Campground Deletion Test", () => {
     const sampleBooking = { _id: sampleBookingId, bookDate: (new Date() - 1), bookEndDate: (new Date() + 1), }
     
     const req = { params: { id: sampleCampgroundId } }
-    const res = { status: jest.fn().mockReturnThis(), json: jest.fn() }
+    const res = { status: jest.fn().mockReturnThis(), json: jest.fn().mockReturnThis() }
     const next = jest.fn();
     
     // Clear mock data between tests to prevent test pollution
@@ -60,14 +60,13 @@ describe("Campground Deletion Test", () => {
     });
    
     it("should handle error by returning a 400 status", async () => {
-        Campground.findById.mockResolvedValue(sampleCampground);
+        Campground.findById.mockRejectedValue(new Error("Test error"));
         Booking.find.mockResolvedValue([]);
         
-        const req = { }
         await campgrounds.deleteCampground(req, res, next)
         
         expect(res.status).toHaveBeenCalledWith(400);
-        expect(res.json).toHaveBeenCalled();
+        expect(res.json).toHaveBeenCalledWith({ success: false, message: "Test error" });
     });
     
 })

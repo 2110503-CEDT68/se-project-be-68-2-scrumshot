@@ -260,13 +260,6 @@ exports.deleteCampground = async (req, res, next) => {
       });
     }
 
-    // if (req.user.role !== "admin") { // THIS WONT CALL BECAUSE OF MIDDLEWARE
-    //   return res.status(403).json({
-    //     success: false,
-    //     message: `User ${req.user.id} is not authorized to delete this Campground`,
-    //   });
-    // }
-
     const activeBookings = await Booking.find({
       campground: req.params.id,
       bookEndDate: { $gte: new Date() }
