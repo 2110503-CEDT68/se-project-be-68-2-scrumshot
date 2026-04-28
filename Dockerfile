@@ -1,20 +1,27 @@
 # Use Node.js 18 Alpine as base image
 FROM node:18-alpine
 
-# Set working directory
+# Use a dedicated working directory
 WORKDIR /app
 
-# Copy package files
+# Set production environment
+ENV NODE_ENV=production
+
+# Copy package manifests and lockfile for reproducible installs
 COPY package*.json ./
+COPY package-lock.json* ./
 
-# Install dependencies
-RUN npm install
+# Install only production dependencies
+RUN npm ci --only=production
 
-# Copy source code
+# Copy application source
 COPY . .
 
-# Expose port
+# Remove dev files if any (safe-guard)
+RUN rm -rf ./.npmignore || true
+
+# Expose application port
 EXPOSE 5000
 
-# Start the application
+# Default command
 CMD ["node", "index.js"]
