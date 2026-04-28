@@ -179,6 +179,13 @@ exports.updateBooking = async (req, res, next) => {
       });
     }
 
+    if (booking.review && !booking.review.isHidden && booking.review.rating !== undefined) {
+      return res.status(400).json({
+        success: false,
+        message: "Cannot update a booking that already has a review",
+      });
+    }
+
     delete req.body.review;
 
     if (req.user.role !== "admin") {
